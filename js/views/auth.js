@@ -52,6 +52,37 @@ export const AuthView = {
 
         try {
             if (AppState.authMode === 'login') {
+                // 显示登录进度
+                submitBtn.textContent = '检查服务状态...';
+                
+                // 开始监控认证检查
+                if (window.App && window.App.performanceMonitor) {
+                    window.App.performanceMonitor.startAuthCheck();
+                }
+                
+                // 检查认证服务状态（非阻塞）
+                try {
+                    const authServiceHealthy = await ApiService.checkAuthServiceStatus();
+                    if (!authServiceHealthy) {
+                        console.warn('⚠️ 认证服务响应较慢，但继续尝试登录...');
+                        // 显示用户友好的提示
+                        UI.showNotification('认证服务响应较慢，正在尝试登录...', 'warning');
+                    }
+                } catch (error) {
+                    console.warn('⚠️ 认证服务检查失败，但继续尝试登录...', error.message);
+                    UI.showNotification('正在尝试登录，请稍候...', 'info');
+                }
+                
+                // 完成认证检查监控
+                if (window.App && window.App.performanceMonitor) {
+                    window.App.performanceMonitor.endAuthCheck();
+                }
+                
+                submitBtn.textContent = '登录中...';
+                
+                // 添加登录进度提示
+                UI.showNotification('正在验证用户凭据，请稍候...', 'info');
+                
                 // [FIX] Manually handle login success to ensure navigation to the game lobby.
                 const data = await ApiService.signIn(email, password);
                 
@@ -74,7 +105,29 @@ export const AuthView = {
             }
         } catch (error) {
             // The ApiService throws detailed errors, which we display here.
-            UI.showNotification(error.message, 'error');
+            console.error('认证错误详情:', error);
+            
+            // 根据错误类型提供更友好的提示
+            let errorMessage = error.message;
+            if (error.message.includes('认证服务响应超时')) {
+                errorMessage = '认证服务暂时不可用，请稍后重试。如果问题持续，请联系管理员。';
+            } else if (error.message.includes('Invalid login credentials')) {
+                errorMessage = '邮箱或密码错误，请检查后重试。';
+            } else if (error.message.includes('Too many requests')) {
+                errorMessage = '登录尝试过于频繁，请稍后再试。';
+            } else if (error.message.includes('signal is aborted')) {
+                errorMessage = '认证服务响应超时，请稍后重试。如果问题持续，请联系管理员。';
+            }
+            
+            UI.showNotification(errorMessage, 'error');
+            
+            // 在开发环境下提供更多调试信息
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                console.log('🔍 调试信息:');
+                console.log('- 错误类型:', error.name);
+                console.log('- 错误消息:', error.message);
+                console.log('- 错误堆栈:', error.stack);
+            }
         } finally {
             submitBtn.disabled = false;
             // Restore the button text based on the current mode.

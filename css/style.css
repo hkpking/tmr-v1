@@ -249,6 +249,70 @@ body {
 .admin-input:focus, .admin-textarea:focus, .admin-select:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4); }
 .admin-checkbox { width: 1.25rem; height: 1.25rem; border: 1px solid #cbd5e1; border-radius: 0.25rem; }
 
+/* ==================== INPUT FIELD STYLES ==================== */
+.input-field {
+    background-color: rgba(30, 41, 59, 0.8) !important; /* slate-800 with transparency */
+    border: 2px solid rgba(71, 85, 105, 0.5) !important; /* slate-600 border */
+    color: #f1f5f9 !important; /* slate-100 text color */
+    transition: all 0.3s ease !important;
+}
+
+.input-field::placeholder {
+    color: #94a3b8 !important; /* slate-400 placeholder color */
+    opacity: 0.8 !important;
+}
+
+.input-field:focus {
+    outline: none !important;
+    border-color: #3b82f6 !important; /* blue-500 */
+    background-color: rgba(30, 41, 59, 0.9) !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2) !important;
+}
+
+.input-field:hover {
+    border-color: #64748b !important; /* slate-500 */
+    background-color: rgba(30, 41, 59, 0.85) !important;
+}
+
+/* 确保表单容器有足够的对比度 */
+#auth-container .module-container {
+    background-color: rgba(15, 23, 42, 0.95) !important; /* slate-900 with high opacity */
+    border: 2px solid rgba(59, 130, 246, 0.3) !important; /* blue border for better visibility */
+}
+
+/* 表单标题样式 */
+#form-title {
+    color: #f8fafc !important; /* slate-50 for high contrast */
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* 切换模式链接样式 */
+#switch-mode-btn {
+    color: #60a5fa !important; /* blue-400 */
+    text-decoration: underline !important;
+}
+
+#switch-mode-btn:hover {
+    color: #93c5fd !important; /* blue-300 */
+}
+
+/* 提示文字样式 */
+#prompt-text {
+    color: #cbd5e1 !important; /* slate-300 */
+}
+
+/* 返回按钮样式 */
+#back-to-landing-btn {
+    color: #60a5fa !important; /* blue-400 */
+    text-decoration: none !important;
+    transition: color 0.3s ease !important;
+}
+
+#back-to-landing-btn:hover {
+    color: #93c5fd !important; /* blue-300 */
+    text-decoration: underline !important;
+}
+
 /* ==================== OTHER COMPONENT STYLES ==================== */
 .module-container { background-color: rgba(30, 41, 59, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
 .personal-leaderboard-item { display: grid; grid-template-columns: 2rem 1fr auto; gap: 1rem; align-items: center; padding: 0.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.07); transition: background-color 0.3s; }

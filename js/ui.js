@@ -162,4 +162,48 @@ export const UI = {
         this.elements.landing.narrativeContainer.classList.remove('hidden');
         this.elements.landing.narrativeContainer.classList.add('flex');
     },
+
+    showLoadingState(message = '加载中...') {
+        // 移除现有的加载状态
+        this.hideLoadingState();
+        
+        const loadingEl = document.createElement('div');
+        loadingEl.id = 'global-loading';
+        loadingEl.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50';
+        loadingEl.innerHTML = `
+            <div class="bg-slate-800 p-6 rounded-lg text-center shadow-2xl">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-400 mx-auto mb-4"></div>
+                <p class="text-white text-lg">${message}</p>
+                <p class="text-gray-400 text-sm mt-2">请稍候...</p>
+            </div>
+        `;
+        document.body.appendChild(loadingEl);
+    },
+
+    hideLoadingState() {
+        const loadingEl = document.getElementById('global-loading');
+        if (loadingEl) {
+            loadingEl.remove();
+        }
+    },
+
+    showProgressLoading(message = '加载中...', progress = 0) {
+        // 移除现有的加载状态
+        this.hideLoadingState();
+        
+        const loadingEl = document.createElement('div');
+        loadingEl.id = 'global-loading';
+        loadingEl.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50';
+        loadingEl.innerHTML = `
+            <div class="bg-slate-800 p-6 rounded-lg text-center shadow-2xl w-80">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-400 mx-auto mb-4"></div>
+                <p class="text-white text-lg mb-2">${message}</p>
+                <div class="w-full bg-gray-700 rounded-full h-2 mb-2">
+                    <div class="bg-sky-400 h-2 rounded-full transition-all duration-300" style="width: ${progress}%"></div>
+                </div>
+                <p class="text-gray-400 text-sm">${progress}%</p>
+            </div>
+        `;
+        document.body.appendChild(loadingEl);
+    },
 };

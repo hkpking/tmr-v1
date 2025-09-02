@@ -4,23 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>流程天命 - 英雄之旅</title>
-    <!-- [CORRECTED] Using the original TailwindCSS script for development compatibility -->
-    <script src="https://cdn.tailwindcss.com"></script> 
-    <!-- [CORRECTED] Replaced Supabase CDN with a correct and reliable domestic-friendly one -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- [MODIFIED] Replaced Marked.js CDN with a domestic one -->
-    <script src="https://cdn.staticfile.org/marked/12.0.2/marked.min.js"></script>
-    <!-- [MODIFIED] Replaced Video.js CSS CDN with a domestic one -->
-    <link href="https://cdn.staticfile.org/video.js/8.10.0/video-js.min.css" rel="stylesheet" />
-    <!-- [MODIFIED] Replaced Google Fonts with a domestic mirror -->
-    <link href="https://fonts.loli.net/css2?family=Ma+Shan+Zheng&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <!-- [LOCALIZED] Using local TailwindCSS -->
+    <script src="assets/libs/tailwind.min.js"></script> 
+    <!-- [LOCALIZED] Using local Supabase JS -->
+    <script src="assets/libs/supabase.min.js"></script>
+    <!-- [LOCALIZED] Using local Marked.js -->
+    <script src="assets/libs/marked.min.js"></script>
+    <!-- [LOCALIZED] Using local Video.js CSS -->
+    <link href="assets/libs/video-js.min.css" rel="stylesheet" />
+    <!-- [LOCALIZED] Using local Google Fonts CSS -->
+    <link href="assets/libs/google-fonts.css" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="text-gray-200">
 
     <!-- Background Music Element -->
     <audio id="background-music" loop>
-        <source src="https://down.xjio.cn/filedown/270f9059bd43493aa6855d1ef33229ba/游戏科学-黑神话：悟空(纯音乐).mp3" type="audio/mpeg">
+        <source src="assets/audio/游戏科学-黑神话：悟空(纯音乐)(1).mp3" type="audio/mpeg">
         您的浏览器不支持音频播放。
     </audio>
 
@@ -216,15 +216,53 @@
         </div>
     </div>
 
-    <!-- [MODIFIED] Replaced Video.js JS CDN with a domestic one -->
-    <script src="https://cdn.staticfile.org/video.js/8.10.0/video.min.js"></script>
+    <!-- [LOCALIZED] Using local Video.js JS -->
+    <script src="assets/libs/video.min.js"></script>
     <script>
+        // 检查关键依赖是否加载成功
+        window.addEventListener('DOMContentLoaded', function() {
+            const requiredLibs = [
+                { name: 'supabase', check: () => typeof window.supabase !== 'undefined' },
+                { name: 'marked', check: () => typeof window.marked !== 'undefined' }
+            ];
+            
+            const missingLibs = requiredLibs.filter(lib => !lib.check());
+            
+            if (missingLibs.length > 0) {
+                document.body.innerHTML = `
+                    <div style="color: red; text-align: center; padding: 50px; font-family: sans-serif; background: #1e1e1e; min-height: 100vh; display: flex; align-items: center; justify-content: center;">
+                        <div style="background: #2d2d2d; padding: 40px; border-radius: 10px; border: 2px solid #ff4444;">
+                            <h1 style="color: #ff4444; margin-bottom: 20px;">⚠️ 依赖加载失败</h1>
+                            <p style="color: #ccc; margin-bottom: 20px;">以下库未能正确加载:</p>
+                            <ul style="color: #ff6666; text-align: left; margin-bottom: 30px;">
+                                ${missingLibs.map(lib => `<li>${lib.name}</li>`).join('')}
+                            </ul>
+                            <p style="color: #ccc; margin-bottom: 20px;">可能的原因:</p>
+                            <ul style="color: #aaa; text-align: left; margin-bottom: 30px; font-size: 14px;">
+                                <li>网络连接问题</li>
+                                <li>本地文件缺失</li>
+                                <li>浏览器缓存问题</li>
+                            </ul>
+                            <button onclick="location.reload()" style="background: #007acc; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; font-size: 16px;">
+                                🔄 刷新页面重试
+                            </button>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+            
+            // 所有依赖加载成功，继续初始化
+            console.log('✅ 所有依赖加载成功');
+        });
+
         // Supabase configuration remains unchanged as requested
         window.APP_CONFIG = {
             SUPABASE_URL: 'https://mfxlcdsrnzxjslrfaawz.supabase.co',
             SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1meGxjZHNybnp4anNscmZhYXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE2ODQyODMsImV4cCI6MjA2NzI2MDI4M30.wTuqqQkOP2_ZwfUU_xM0-X9YjkM39-kewjN41Pxa_wA'
         };
     </script>
+    <script type="module" src="js/performance-monitor.js"></script>
     <script type="module" src="js/app.js"></script>
 </body>
 </html>

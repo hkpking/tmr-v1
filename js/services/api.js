@@ -14,13 +14,135 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
     throw new Error("Supabase URL or Key is missing.");
 }
 
-const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+// 根据请求类型设置不同的超时时间
+const getTimeoutForRequest = (url, options = {}) => {
+    // 从URL或options中判断请求类型
+    if (url.includes('/auth/')) return 30000; // 认证请求30秒（进一步增加）
+    if (options.timeoutType) {
+        const timeoutMap = {
+            'auth': 30000,      // 认证请求30秒
+            'user_progress': 8000,  // 用户进度8秒
+            'learning_map': 12000,  // 学习地图12秒
+            'leaderboard': 6000,    // 排行榜6秒
+            'challenges': 8000,     // 挑战数据8秒
+            'profile': 6000,        // 用户档案6秒
+            'default': 10000        // 默认10秒
+        };
+        return timeoutMap[options.timeoutType] || timeoutMap.default;
+    }
+    return 10000; // 默认10秒
+};
+
+const db = createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true
+    },
+    global: {
+        fetch: (url, options = {}) => {
+            const timeout = getTimeoutForRequest(url, options);
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => {
+                console.warn(`请求超时 (${timeout}ms):`, url);
+                controller.abort();
+            }, timeout);
+            
+            return fetch(url, {
+                ...options,
+                signal: controller.signal
+            }).finally(() => {
+                clearTimeout(timeoutId);
+            });
+        }
+    }
+});
+
+// 重试机制工具函数
+async function withRetry(fn, maxRetries = 3, delay = 1000, operationName = '操作') {
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            return await fn();
+        } catch (error) {
+            if (i === maxRetries - 1) {
+                console.error(`${operationName} 重试 ${maxRetries} 次后仍然失败:`, error);
+                throw error;
+            }
+            
+            console.warn(`${operationName} 失败，${delay}ms后重试 (${i + 1}/${maxRetries}):`, error.message);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            delay *= 2; // 指数退避
+        }
+    }
+}
+
+// 简单的内存缓存
+const cache = new Map();
+const CACHE_DURATION = 5 * 60 * 1000; // 5分钟缓存
+
+function getCachedData(key) {
+    const cached = cache.get(key);
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+        console.log(`📦 使用缓存数据: ${key}`);
+        return cached.data;
+    }
+    return null;
+}
+
+function setCachedData(key, data) {
+    cache.set(key, {
+        data,
+        timestamp: Date.now()
+    });
+    console.log(`💾 缓存数据: ${key}`);
+}
 
 export const ApiService = {
     db: db,
 
     initialize() {
         console.log("ApiService initialized with Supabase client.");
+        // 检测网络状态
+        this.checkNetworkStatus();
+    },
+
+    // 检测网络状态
+    async checkNetworkStatus() {
+        try {
+            const startTime = Date.now();
+            const response = await fetch('https://mfxlcdsrnzxjslrfaawz.supabase.co/rest/v1/', {
+                method: 'HEAD',
+                signal: AbortSignal.timeout(5000)
+            });
+            const duration = Date.now() - startTime;
+            console.log(`🌐 网络连接检测: ${response.ok ? '正常' : '异常'} (${duration}ms)`);
+            return response.ok;
+        } catch (error) {
+            console.warn('🌐 网络连接检测失败:', error.message);
+            return false;
+        }
+    },
+
+    // 检测认证服务状态
+    async checkAuthServiceStatus() {
+        try {
+            const startTime = Date.now();
+            const response = await fetch('https://mfxlcdsrnzxjslrfaawz.supabase.co/auth/v1/settings', {
+                method: 'GET',
+                headers: {
+                    'apikey': SUPABASE_KEY
+                },
+                signal: AbortSignal.timeout(3000) // 减少到3秒超时
+            });
+            const duration = Date.now() - startTime;
+            const isHealthy = response.ok && duration < 2000; // 2秒内响应认为健康
+            console.log(`🔐 认证服务检测: ${isHealthy ? '健康' : '响应慢'} (${duration}ms)`);
+            return isHealthy;
+        } catch (error) {
+            console.warn('🔐 认证服务检测失败:', error.message);
+            // 如果检测失败，仍然允许登录尝试
+            return true;
+        }
     },
 
     async awardAchievement(achievementKey) {
@@ -58,9 +180,26 @@ export const ApiService = {
     },
 
     async fetchLearningMap() {
-        const { data, error } = await this.db.from("categories").select("*, chapters(*, sections(*, blocks(*)))").order("order").order("order", { foreignTable: "chapters" }).order("order", { foreignTable: "chapters.sections" }).order("order", { foreignTable: "chapters.sections.blocks" });
-        if (error) throw error;
-        return data;
+        const cacheKey = 'learning_map';
+        const cached = getCachedData(cacheKey);
+        if (cached) return cached;
+        
+        return withRetry(async () => {
+            const startTime = Date.now();
+            const { data, error } = await this.db.from("categories")
+                .select("*, chapters(*, sections(*, blocks(*)))")
+                .order("order")
+                .order("order", { foreignTable: "chapters" })
+                .order("order", { foreignTable: "chapters.sections" })
+                .order("order", { foreignTable: "chapters.sections.blocks" });
+            if (error) throw error;
+            
+            const duration = Date.now() - startTime;
+            console.log(`⏱️ 获取学习地图耗时: ${duration}ms`);
+            
+            setCachedData(cacheKey, data);
+            return data;
+        }, 3, 1000, '获取学习地图');
     },
     async fetchAllCategoriesForAdmin() {
         const { data, error } = await this.db.from('categories').select('*, chapters(id, title, description, order, sections(id, title, order, blocks(*)))').order('order');
@@ -77,9 +216,21 @@ export const ApiService = {
     async deleteBlock(id) { const { error } = await this.db.from('blocks').delete().eq('id', id); if (error) throw error; },
     
     async fetchLeaderboard() {
-        const { data, error } = await this.db.rpc('get_leaderboard_with_names').limit(10);
-        if (error) { console.error("Error fetching leaderboard:", error); throw new Error("获取排行榜失败。"); }
-        return data;
+        const cacheKey = 'leaderboard';
+        const cached = getCachedData(cacheKey);
+        if (cached) return cached;
+        
+        return withRetry(async () => {
+            const startTime = Date.now();
+            const { data, error } = await this.db.rpc('get_leaderboard_with_names').limit(10);
+            if (error) { console.error("Error fetching leaderboard:", error); throw new Error("获取排行榜失败。"); }
+            
+            const duration = Date.now() - startTime;
+            console.log(`⏱️ 获取排行榜耗时: ${duration}ms`);
+            
+            setCachedData(cacheKey, data);
+            return data;
+        }, 2, 1000, '获取排行榜');
     },
 
     async getScoreInfo(userId) {
@@ -150,9 +301,20 @@ export const ApiService = {
     },
 
     async getUserProgress(userId) {
-        const { data, error } = await this.db.from('user_progress').select('completed_blocks, awarded_points_blocks').eq('user_id', userId).single();
-        if (error && error.code !== 'PGRST116') { console.error('Error fetching user progress:', error); throw new Error('获取用户进度失败'); }
-        return { completed: data ? data.completed_blocks || [] : [], awarded: data ? data.awarded_points_blocks || [] : [] };
+        return withRetry(async () => {
+            const { data, error } = await this.db.from('user_progress')
+                .select('completed_blocks, awarded_points_blocks')
+                .eq('user_id', userId)
+                .single();
+            if (error && error.code !== 'PGRST116') { 
+                console.error('Error fetching user progress:', error); 
+                throw new Error('获取用户进度失败'); 
+            }
+            return { 
+                completed: data ? data.completed_blocks || [] : [], 
+                awarded: data ? data.awarded_points_blocks || [] : [] 
+            };
+        }, 3, 1000, '获取用户进度');
     },
 
     async saveUserProgress(userId, progressData) {
@@ -170,12 +332,63 @@ export const ApiService = {
     },
 
     async signIn(email, password) {
-        const { data, error } = await this.db.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        return data;
+        return withRetry(async () => {
+            try {
+                console.log('🔐 开始登录请求...');
+                const startTime = Date.now();
+                
+                // 尝试使用更短的超时时间进行快速登录
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 20000); // 20秒超时
+                
+                const { data, error } = await this.db.auth.signInWithPassword({ 
+                    email, 
+                    password 
+                });
+                
+                clearTimeout(timeoutId);
+                
+                const duration = Date.now() - startTime;
+                console.log(`⏱️ 登录请求耗时: ${duration}ms`);
+                
+                if (error) {
+                    console.error('Login error:', error);
+                    throw error;
+                }
+                
+                console.log('✅ 登录成功');
+                return data;
+            } catch (error) {
+                console.error('Network or authentication error:', error);
+                if (error.name === 'AbortError') {
+                    throw new Error('登录超时，认证服务响应缓慢，请稍后重试');
+                } else if (error.message.includes('ERR_CONNECTION_TIMED_OUT')) {
+                    throw new Error('网络连接超时，请检查网络连接');
+                } else if (error.message.includes('Failed to fetch')) {
+                    throw new Error('网络连接失败，请检查网络连接');
+                } else if (error.message.includes('signal is aborted')) {
+                    throw new Error('认证服务响应超时，请稍后重试');
+                }
+                throw error;
+            }
+        }, 2, 5000, '用户登录'); // 减少重试次数到2次，增加间隔到5秒
     },
     async signOut() { 
         const { error } = await this.db.auth.signOut();
         if (error) { console.error("Sign out error", error); }
+        // 清除缓存
+        this.clearCache();
+    },
+
+    // 清除所有缓存
+    clearCache() {
+        cache.clear();
+        console.log('🗑️ 已清除所有缓存');
+    },
+
+    // 清除特定缓存
+    clearCacheKey(key) {
+        cache.delete(key);
+        console.log(`🗑️ 已清除缓存: ${key}`);
     },
 };

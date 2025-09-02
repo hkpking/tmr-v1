@@ -11,16 +11,32 @@ import { CourseView } from './views/course.js';
 import { AdminView } from './views/admin.js';
 import { ProfileView } from './views/profile.js';
 import { getFactionInfo } from './constants.js';
+import { PerformanceMonitor } from './performance-monitor.js';
 
 const App = {
+    // 添加标志位防止重复处理认证
+    isHandlingAuth: false,
+    performanceMonitor: null,
+    
     init() {
+        // 初始化性能监控
+        this.performanceMonitor = new PerformanceMonitor();
+        
         this.bindEvents();
         this.initLandingPageAnimation();
         this.initMusicControls();
         ApiService.initialize();
         ApiService.db.auth.onAuthStateChange((_event, session) => {
+            if (this.isHandlingAuth) {
+                console.log('认证处理中，跳过重复处理');
+                return;
+            }
+            
             if (session && session.user) {
-                this.handleLogin(session.user, false); 
+                this.isHandlingAuth = true;
+                this.handleLogin(session.user, false).finally(() => {
+                    this.isHandlingAuth = false;
+                });
             } else {
                 AppState.user = null;
                 AppState.profile = null;
@@ -195,20 +211,45 @@ const App = {
             if(navigate) UI.switchTopLevelView('game-lobby');
             return;
         }
-        resetUserProgressState();
-        AppState.user = user;
+        
         try {
-            const [profile, scoreInfo] = await Promise.all([ ApiService.getProfile(user.id), ApiService.getScoreInfo(user.id) ]);
-            AppState.profile = { ...(profile || { role: 'user', faction: null }), username: scoreInfo?.username, points: scoreInfo?.points || 0 };
+            // 开始监控登录性能
+            if (this.performanceMonitor) {
+                this.performanceMonitor.startLogin();
+            }
+            
+            // 显示登录加载状态
+            UI.showLoadingState('正在验证用户信息...');
+            
+            resetUserProgressState();
+            AppState.user = user;
+            
+            const [profile, scoreInfo] = await Promise.all([ 
+                ApiService.getProfile(user.id), 
+                ApiService.getScoreInfo(user.id) 
+            ]);
+            
+            AppState.profile = { 
+                ...(profile || { role: 'user', faction: null }), 
+                username: scoreInfo?.username, 
+                points: scoreInfo?.points || 0 
+            };
             
             if (!AppState.profile.faction) {
+                UI.hideLoadingState();
                 this.showFactionSelection();
             } else {
                 await this.loadMainAppData();
                 if(navigate) UI.switchTopLevelView('game-lobby');
             }
+            
+            // 完成登录监控
+            if (this.performanceMonitor) {
+                this.performanceMonitor.endLogin();
+            }
         } catch (error) {
             console.error("Login process failed:", error);
+            UI.hideLoadingState();
             UI.showNotification(`登录失败: ${error.message}`, 'error');
             ApiService.signOut();
         }
@@ -216,26 +257,65 @@ const App = {
 
     async loadMainAppData() {
         try {
-            const [progress, categories, challenges, personalLb, factionLb] = await Promise.all([
+            // 开始监控数据加载性能
+            if (this.performanceMonitor) {
+                this.performanceMonitor.startDataLoad();
+            }
+            
+            // 显示加载状态
+            UI.showLoadingState('正在加载核心数据...');
+            
+            // 第一阶段：加载核心数据（用户进度和学习地图）
+            const [progress, categories] = await Promise.all([
                 ApiService.getUserProgress(AppState.user.id),
-                ApiService.fetchLearningMap(),
-                ApiService.fetchActiveChallenges(),
-                ApiService.fetchLeaderboard(),
-                ApiService.fetchFactionLeaderboard()
+                ApiService.fetchLearningMap()
             ]);
             
             AppState.userProgress.completedBlocks = new Set(progress.completed);
             AppState.userProgress.awardedPointsBlocks = new Set(progress.awarded);
             AppState.learningMap.categories = categories;
-            AppState.activeChallenges = challenges;
-            AppState.leaderboard = personalLb;
-            AppState.factionLeaderboard = factionLb;
             this.flattenLearningStructure();
             this.updateHeaders();
+            
+            // 立即显示界面，不等待其他数据
             this.renderGameLobby(true);
+            UI.hideLoadingState();
+            
+            // 第二阶段：异步加载非关键数据
+            this.loadSecondaryData();
+            
+            // 完成数据加载监控
+            if (this.performanceMonitor) {
+                this.performanceMonitor.endDataLoad();
+            }
+            
         } catch (error) {
             console.error("Failed to load main app data:", error);
-            UI.showNotification(`加载数据失败: ${error.message}`, 'error');
+            UI.hideLoadingState();
+            UI.showNotification(`加载核心数据失败: ${error.message}`, 'error');
+        }
+    },
+
+    async loadSecondaryData() {
+        try {
+            console.log('开始加载次要数据...');
+            const [challenges, personalLb, factionLb] = await Promise.allSettled([
+                ApiService.fetchActiveChallenges(),
+                ApiService.fetchLeaderboard(),
+                ApiService.fetchFactionLeaderboard()
+            ]);
+            
+            AppState.activeChallenges = challenges.status === 'fulfilled' ? challenges.value : [];
+            AppState.leaderboard = personalLb.status === 'fulfilled' ? personalLb.value : [];
+            AppState.factionLeaderboard = factionLb.status === 'fulfilled' ? factionLb.value : [];
+            
+            // 更新排行榜显示
+            this.renderLeaderboards();
+            console.log('次要数据加载完成');
+            
+        } catch (error) {
+            console.error("Failed to load secondary data:", error);
+            // 不显示错误通知，因为这是非关键数据
         }
     },
 
@@ -388,9 +468,26 @@ window.App = App;
 
 window.onload = () => {
     try { 
+        // 检查必要的配置
+        if (!window.APP_CONFIG || !window.APP_CONFIG.SUPABASE_URL || !window.APP_CONFIG.SUPABASE_KEY) {
+            throw new Error('应用配置缺失，无法启动');
+        }
+        
         App.init(); 
+        console.log('✅ 应用初始化成功');
     } catch (error) {
-        console.error("Failed to initialize application:", error);
-        document.body.innerHTML = `<div style="color: red; text-align: center; padding: 50px; font-family: sans-serif;"><h1>Application Failed to Start</h1><p>${error.message}</p></div>`;
+        console.error("❌ 应用初始化失败:", error);
+        document.body.innerHTML = `
+            <div style="color: red; text-align: center; padding: 50px; font-family: sans-serif; background: #1e1e1e; min-height: 100vh; display: flex; align-items: center; justify-content: center;">
+                <div style="background: #2d2d2d; padding: 40px; border-radius: 10px; border: 2px solid #ff4444;">
+                    <h1 style="color: #ff4444; margin-bottom: 20px;">❌ 应用启动失败</h1>
+                    <p style="color: #ccc; margin-bottom: 20px;">错误信息:</p>
+                    <p style="color: #ff6666; margin-bottom: 30px; font-family: monospace; background: #1a1a1a; padding: 10px; border-radius: 5px;">${error.message}</p>
+                    <button onclick="location.reload()" style="background: #007acc; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; font-size: 16px;">
+                        🔄 重新加载
+                    </button>
+                </div>
+            </div>
+        `;
     }
 };
