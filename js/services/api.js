@@ -335,11 +335,74 @@ export const ApiService = {
             }
         }, 2, 5000, '用户登录'); // 减少重试次数到2次，增加间隔到5秒
     },
-    async signOut() { 
-        const { error } = await this.db.auth.signOut();
-        if (error) { console.error("Sign out error", error); }
-        // 清除缓存
-        this.clearCache();
+    async signOut() {
+        try {
+            console.log('🚪 开始退出流程...');
+            
+            // 第一步：检查当前会话状态
+            const { data: { session }, error: sessionError } = await this.db.auth.getSession();
+            
+            if (sessionError) {
+                console.warn('获取会话状态失败:', sessionError);
+            }
+            
+            if (session) {
+                console.log('✅ 发现有效会话，执行服务器端退出');
+                try {
+                    // 只有在存在有效会话时才调用服务器端退出
+                    const { error } = await this.db.auth.signOut();
+                    if (error) {
+                        console.error("服务器端退出失败:", error);
+                        // 即使服务器端退出失败，也继续执行本地清理
+                    } else {
+                        console.log('✅ 服务器端退出成功');
+                    }
+                } catch (signOutError) {
+                    console.error("退出请求异常:", signOutError);
+                    // 继续执行本地清理
+                }
+            } else {
+                console.warn("⚠️ 未发现有效会话，跳过服务器端退出");
+            }
+            
+            // 第二步：无论如何都执行本地清理
+            this.clearCache();
+            
+            // 第三步：清理本地存储中的认证数据
+            try {
+                // 清理可能的本地存储数据
+                localStorage.removeItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token');
+                sessionStorage.clear();
+                console.log('✅ 本地存储清理完成');
+            } catch (storageError) {
+                console.warn('本地存储清理失败:', storageError);
+            }
+            
+            // 第四步：触发全局退出事件
+            this.triggerSignOutEvent();
+            
+            console.log('✅ 退出流程完成');
+            
+        } catch (error) {
+            console.error('退出流程异常:', error);
+            // 即使出现异常，也要确保本地状态被清理
+            this.clearCache();
+            this.triggerSignOutEvent();
+        }
+    },
+
+    // 新增：触发退出事件的方法
+    triggerSignOutEvent() {
+        try {
+            // 触发自定义事件，通知应用其他部分用户已退出
+            const signOutEvent = new CustomEvent('userSignOut', {
+                detail: { timestamp: Date.now() }
+            });
+            window.dispatchEvent(signOutEvent);
+            console.log('✅ 退出事件已触发');
+        } catch (error) {
+            console.warn('触发退出事件失败:', error);
+        }
     },
 
     // 清除所有缓存

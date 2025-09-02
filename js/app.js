@@ -33,15 +33,30 @@ const App = {
             }
             
             if (session && session.user) {
+                console.log('🔄 检测到有效会话，自动恢复登录状态');
                 this.isHandlingAuth = true;
-                this.handleLogin(session.user, false).finally(() => {
+                // [OPTIMIZATION] Set navigate to true to automatically enter the lobby
+                this.handleLogin(session.user, true).finally(() => {
                     this.isHandlingAuth = false;
                 });
             } else {
+                // 会话为空时的处理
+                console.log('🔓 检测到用户会话已失效');
                 AppState.user = null;
                 AppState.profile = null;
                 resetUserProgressState();
                 UI.showNarrative();
+            }
+        });
+
+        // 新增：监听自定义退出事件
+        window.addEventListener('userSignOut', (event) => {
+            console.log('📢 收到退出事件:', event.detail);
+            // 确保应用状态被正确清理
+            if (AppState.user) {
+                AppState.user = null;
+                AppState.profile = null;
+                resetUserProgressState();
             }
         });
     },
@@ -159,8 +174,41 @@ const App = {
         // --- Game Lobby Events ---
         UI.elements.lobby.playerInfo.addEventListener('click', () => ProfileView.showProfileView());
         UI.elements.lobby.logoutBtn.addEventListener('click', async () => {
-            await ApiService.signOut();
-            UI.switchTopLevelView('landing'); 
+            try {
+                // 显示退出确认或加载状态
+                UI.showLoadingState('正在退出...');
+                
+                // 调用优化的退出方法
+                await ApiService.signOut();
+                
+                // 强制清理应用状态
+                AppState.user = null;
+                AppState.profile = null;
+                resetUserProgressState();
+                
+                // 隐藏加载状态
+                UI.hideLoadingState();
+                
+                // 切换到登录页面
+                UI.switchTopLevelView('landing');
+                
+                // 显示退出成功提示
+                UI.showNotification('已安全退出', 'success');
+                
+            } catch (error) {
+                console.error('退出过程中发生错误:', error);
+                
+                // 即使退出失败，也要强制清理本地状态
+                AppState.user = null;
+                AppState.profile = null;
+                resetUserProgressState();
+                
+                UI.hideLoadingState();
+                UI.switchTopLevelView('landing');
+                
+                // 显示退出提示（即使有错误）
+                UI.showNotification('已退出登录', 'info');
+            }
         });
 
         // [MODIFIED] Centralized bottom nav event handling
@@ -208,6 +256,7 @@ const App = {
 
     async handleLogin(user, navigate = true) {
         if (AppState.user && AppState.user.id === user.id) {
+            console.log('✅ 用户已登录，直接跳转到游戏大厅');
             if(navigate) UI.switchTopLevelView('game-lobby');
             return;
         }
@@ -240,7 +289,10 @@ const App = {
                 this.showFactionSelection();
             } else {
                 await this.loadMainAppData();
-                if(navigate) UI.switchTopLevelView('game-lobby');
+                if(navigate) {
+                    console.log('🎮 数据加载完成，自动跳转到游戏大厅');
+                    UI.switchTopLevelView('game-lobby');
+                }
             }
             
             // 完成登录监控
