@@ -3,8 +3,15 @@
   "version": "1.1.0",
   "description": "流程天命人 - 英雄之旅",
   "scripts": {
+    "dev": "npm run build-css",
     "build-css": "tailwindcss -i ./css/input.css -o ./dist/output.css --watch",
-    "build-css-prod": "tailwindcss -i ./css/input.css -o ./dist/output.css --minify"
+    "build-css-prod": "tailwindcss -i ./css/input.css -o ./dist/output.css --minify",
+    "build": "npm run build-css-prod",
+    "docker:build": "docker build -t lctmr-app .",
+    "docker:run": "docker run -p 8080:80 lctmr-app",
+    "docker:dev": "docker-compose --profile dev up dev",
+    "docker:prod": "docker-compose up app",
+    "docker:stop": "docker-compose down"
   },
   "devDependencies": {
     "tailwindcss": "^3.4.0"

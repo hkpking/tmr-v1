@@ -1,0 +1,36 @@
+# 依赖
+node_modules
+npm-debug.log*
+
+# 构建产物（在容器内重新构建）
+dist
+
+# 开发工具
+.git
+.gitignore
+README.md
+LOCALIZATION-README.md
+OPTIMIZATION_SUMMARY.md
+DEPLOYMENT.md
+
+# 编辑器配置
+.vscode
+.idea
+*.swp
+*.swo
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+
+# 日志文件
+*.log
+
+# 临时文件
+*.tmp
+*.temp
+
+# Docker 相关
+Dockerfile*
+docker-compose*
+.dockerignore
