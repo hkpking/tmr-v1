@@ -53,31 +53,6 @@ export const AuthView = {
         try {
             if (AppState.authMode === 'login') {
                 // 显示登录进度
-                submitBtn.textContent = '检查服务状态...';
-                
-                // 开始监控认证检查
-                if (window.App && window.App.performanceMonitor) {
-                    window.App.performanceMonitor.startAuthCheck();
-                }
-                
-                // 检查认证服务状态（非阻塞）
-                try {
-                    const authServiceHealthy = await ApiService.checkAuthServiceStatus();
-                    if (!authServiceHealthy) {
-                        console.warn('⚠️ 认证服务响应较慢，但继续尝试登录...');
-                        // 显示用户友好的提示
-                        UI.showNotification('认证服务响应较慢，正在尝试登录...', 'warning');
-                    }
-                } catch (error) {
-                    console.warn('⚠️ 认证服务检查失败，但继续尝试登录...', error.message);
-                    UI.showNotification('正在尝试登录，请稍候...', 'info');
-                }
-                
-                // 完成认证检查监控
-                if (window.App && window.App.performanceMonitor) {
-                    window.App.performanceMonitor.endAuthCheck();
-                }
-                
                 submitBtn.textContent = '登录中...';
                 
                 // 添加登录进度提示

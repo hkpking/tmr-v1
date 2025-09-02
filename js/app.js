@@ -265,24 +265,36 @@ const App = {
             // 显示加载状态
             UI.showLoadingState('正在加载核心数据...');
             
-            // 第一阶段：加载核心数据（用户进度和学习地图）
-            const [progress, categories] = await Promise.all([
+            // 并行加载所有核心数据
+            const [progress, categories, challenges, personalLb, factionLb] = await Promise.allSettled([
                 ApiService.getUserProgress(AppState.user.id),
-                ApiService.fetchLearningMap()
+                ApiService.fetchLearningMap(),
+                ApiService.fetchActiveChallenges(),
+                ApiService.fetchLeaderboard(),
+                ApiService.fetchFactionLeaderboard()
             ]);
             
-            AppState.userProgress.completedBlocks = new Set(progress.completed);
-            AppState.userProgress.awardedPointsBlocks = new Set(progress.awarded);
-            AppState.learningMap.categories = categories;
-            this.flattenLearningStructure();
+            // 处理核心数据
+            if (progress.status === 'fulfilled') {
+                AppState.userProgress.completedBlocks = new Set(progress.value.completed);
+                AppState.userProgress.awardedPointsBlocks = new Set(progress.value.awarded);
+            }
+            
+            if (categories.status === 'fulfilled') {
+                AppState.learningMap.categories = categories.value;
+                this.flattenLearningStructure();
+            }
+            
+            // 处理次要数据
+            AppState.activeChallenges = challenges.status === 'fulfilled' ? challenges.value : [];
+            AppState.leaderboard = personalLb.status === 'fulfilled' ? personalLb.value : [];
+            AppState.factionLeaderboard = factionLb.status === 'fulfilled' ? factionLb.value : [];
+            
             this.updateHeaders();
             
-            // 立即显示界面，不等待其他数据
+            // 立即显示界面
             this.renderGameLobby(true);
             UI.hideLoadingState();
-            
-            // 第二阶段：异步加载非关键数据
-            this.loadSecondaryData();
             
             // 完成数据加载监控
             if (this.performanceMonitor) {
@@ -296,28 +308,7 @@ const App = {
         }
     },
 
-    async loadSecondaryData() {
-        try {
-            console.log('开始加载次要数据...');
-            const [challenges, personalLb, factionLb] = await Promise.allSettled([
-                ApiService.fetchActiveChallenges(),
-                ApiService.fetchLeaderboard(),
-                ApiService.fetchFactionLeaderboard()
-            ]);
-            
-            AppState.activeChallenges = challenges.status === 'fulfilled' ? challenges.value : [];
-            AppState.leaderboard = personalLb.status === 'fulfilled' ? personalLb.value : [];
-            AppState.factionLeaderboard = factionLb.status === 'fulfilled' ? factionLb.value : [];
-            
-            // 更新排行榜显示
-            this.renderLeaderboards();
-            console.log('次要数据加载完成');
-            
-        } catch (error) {
-            console.error("Failed to load secondary data:", error);
-            // 不显示错误通知，因为这是非关键数据
-        }
-    },
+    // loadSecondaryData 函数已合并到 loadMainAppData 中，实现更好的并行化
 
     updateHeaders() {
         const profile = AppState.profile;

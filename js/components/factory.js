@@ -79,7 +79,7 @@ export const ComponentFactory = {
                         AppState.userProgress.awardedPointsBlocks.add(block.id);
                         
                         AppState.profile.points += 10;
-                        if(App) {
+                        if(App && AppState.user) {
                             const updatedLeaderboard = await ApiService.fetchLeaderboard();
                             AppState.leaderboard = updatedLeaderboard;
                             App.renderGameLobby(true);

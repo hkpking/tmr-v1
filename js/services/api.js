@@ -102,48 +102,10 @@ export const ApiService = {
 
     initialize() {
         console.log("ApiService initialized with Supabase client.");
-        // 检测网络状态
-        this.checkNetworkStatus();
+        // 移除预检请求以提升性能
     },
 
-    // 检测网络状态
-    async checkNetworkStatus() {
-        try {
-            const startTime = Date.now();
-            const response = await fetch('https://mfxlcdsrnzxjslrfaawz.supabase.co/rest/v1/', {
-                method: 'HEAD',
-                signal: AbortSignal.timeout(5000)
-            });
-            const duration = Date.now() - startTime;
-            console.log(`🌐 网络连接检测: ${response.ok ? '正常' : '异常'} (${duration}ms)`);
-            return response.ok;
-        } catch (error) {
-            console.warn('🌐 网络连接检测失败:', error.message);
-            return false;
-        }
-    },
-
-    // 检测认证服务状态
-    async checkAuthServiceStatus() {
-        try {
-            const startTime = Date.now();
-            const response = await fetch('https://mfxlcdsrnzxjslrfaawz.supabase.co/auth/v1/settings', {
-                method: 'GET',
-                headers: {
-                    'apikey': SUPABASE_KEY
-                },
-                signal: AbortSignal.timeout(3000) // 减少到3秒超时
-            });
-            const duration = Date.now() - startTime;
-            const isHealthy = response.ok && duration < 2000; // 2秒内响应认为健康
-            console.log(`🔐 认证服务检测: ${isHealthy ? '健康' : '响应慢'} (${duration}ms)`);
-            return isHealthy;
-        } catch (error) {
-            console.warn('🔐 认证服务检测失败:', error.message);
-            // 如果检测失败，仍然允许登录尝试
-            return true;
-        }
-    },
+    // 移除预检函数以提升性能
 
     async awardAchievement(achievementKey) {
         const { error } = await this.db.rpc('award_achievement', { achievement_key: achievementKey });

@@ -90,6 +90,19 @@ export const AdminView = {
     },
 
     async showAdminView() { 
+        // 检查用户是否已登录且具有管理员权限
+        if (!AppState.user) {
+            UI.showNotification('请先登录', 'error');
+            UI.switchTopLevelView('landing');
+            return;
+        }
+        
+        if (!AppState.profile || AppState.profile.role !== 'admin') {
+            UI.showNotification('您没有管理员权限', 'error');
+            UI.switchTopLevelView('game-lobby');
+            return;
+        }
+        
         this.init();
         UI.switchTopLevelView('admin'); 
         this.showCategoryList(); 
