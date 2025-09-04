@@ -8,7 +8,10 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
-require('dotenv').config({ path: '../env.local' });
+// 只在开发环境加载本地配置文件
+if (process.env.NODE_ENV !== 'production') {
+    require('dotenv').config({ path: '../env.local' });
+}
 
 const authRoutes = require('./routes/auth');
 const learningRoutes = require('./routes/learning');
