@@ -9,7 +9,10 @@ export const UI = {
     elements: {
         // --- Global Modals & Notifications ---
         notification: document.getElementById('notification'),
-        factionModal: { container: document.getElementById('faction-selection-modal') },
+        factionModal: { 
+            container: document.getElementById('faction-selection-modal'),
+            grid: document.getElementById('faction-selection-grid')
+        },
         restartModal: { container: document.getElementById('restart-confirm-modal'), confirmBtn: document.getElementById('confirm-restart-btn'), cancelBtn: document.getElementById('cancel-restart-btn') },
         deleteConfirmModal: { container: document.getElementById('delete-confirm-modal'), message: document.getElementById('delete-confirm-message'), confirmBtn: document.getElementById('confirm-delete-btn'), cancelBtn: document.getElementById('cancel-delete-btn') },
 
@@ -110,6 +113,9 @@ export const UI = {
             challengesListView: document.getElementById('admin-challenges-list-view'),
             challengesTableContainer: document.getElementById('admin-challenges-table-container'),
             addChallengeBtn: document.getElementById('admin-add-challenge-btn'),
+            factionsListView: document.getElementById('admin-factions-list-view'),
+            factionsTableContainer: document.getElementById('admin-factions-table-container'),
+            addFactionBtn: document.getElementById('admin-add-faction-btn'),
             modal: {
                 backdrop: document.getElementById('admin-modal-backdrop'),
                 container: document.getElementById('form-modal'),

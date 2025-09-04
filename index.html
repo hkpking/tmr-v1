@@ -8,6 +8,7 @@
     <link href="dist/output.css" rel="stylesheet"> 
     <!-- [LOCALIZED] Using local Supabase JS -->
     <script src="assets/libs/supabase.min.js"></script>
+    <!-- [NEW] Database Adapter for local PostgreSQL -->
     <!-- [LOCALIZED] Using local Marked.js -->
     <script src="assets/libs/marked.min.js"></script>
     <!-- [LOCALIZED] Using local Video.js CSS -->
@@ -15,6 +16,15 @@
     <!-- [LOCALIZED] Using local Google Fonts CSS -->
     <link href="assets/libs/google-fonts.css" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
+    
+    <!-- 环境配置 -->
+    <script>
+        // 设置环境变量
+        window.NODE_ENV = 'development';
+        window.DB_TYPE = 'postgresql';
+        window.API_URL = 'http://localhost:3001/api';
+        window.FRONTEND_URL = 'http://localhost:5500';
+    </script>
 </head>
 <body class="text-gray-200">
 
@@ -42,15 +52,8 @@
         <div class="module-container p-8 rounded-xl shadow-2xl w-full max-w-4xl text-center border-2 border-amber-500/50">
             <h2 class="text-4xl font-calligraphy text-amber-200 mb-4">选择你的归属</h2>
             <p class="text-gray-300 mb-8 text-lg">你的选择，将开启一段新的征程。</p>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div class="faction-card-sm border-2 border-blue-400/50 p-4 rounded-lg hover:bg-blue-400/10 transition-colors"><button data-faction="it_dept" class="faction-btn w-full h-full text-blue-300 text-lg font-semibold">IT技术部</button></div>
-                <div class="faction-card-sm border-2 border-cyan-400/50 p-4 rounded-lg hover:bg-cyan-400/10 transition-colors"><button data-faction="im_dept" class="faction-btn w-full h-full text-cyan-300 text-lg font-semibold">信息管理部</button></div>
-                <div class="faction-card-sm border-2 border-indigo-400/50 p-4 rounded-lg hover:bg-indigo-400/10 transition-colors"><button data-faction="pmo_dept" class="faction-btn w-full h-full text-indigo-300 text-lg font-semibold">项目综合管理部</button></div>
-                <div class="faction-card-sm border-2 border-emerald-400/50 p-4 rounded-lg hover:bg-emerald-400/10 transition-colors"><button data-faction="dm_dept" class="faction-btn w-full h-full text-emerald-300 text-lg font-semibold">数据管理部</button></div>
-                <div class="faction-card-sm border-2 border-amber-400/50 p-4 rounded-lg hover:bg-amber-400/10 transition-colors"><button data-faction="strategy_dept" class="faction-btn w-full h-full text-amber-300 text-lg font-semibold">战略管理部</button></div>
-                <div class="faction-card-sm border-2 border-orange-400/50 p-4 rounded-lg hover:bg-orange-400/10 transition-colors"><button data-faction="logistics_dept" class="faction-btn w-full h-full text-orange-300 text-lg font-semibold">物流IT部</button></div>
-                <div class="faction-card-sm border-2 border-rose-400/50 p-4 rounded-lg hover:bg-rose-400/10 transition-colors"><button data-faction="aoc_dept" class="faction-btn w-full h-full text-rose-300 text-lg font-semibold">项目AOC</button></div>
-                <div class="faction-card-sm border-2 border-purple-400/50 p-4 rounded-lg hover:bg-purple-400/10 transition-colors"><button data-faction="3333_dept" class="faction-btn w-full h-full text-purple-300 text-lg font-semibold">3333</button></div>
+            <div id="faction-selection-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <!-- 阵营选项将在这里动态生成 -->
             </div>
         </div>
     </div>
@@ -173,6 +176,7 @@
                     <nav class="p-4 space-y-2">
                         <button data-admin-view="categories" class="w-full text-left p-2 rounded-lg text-gray-700 font-semibold hover:bg-gray-200 active">篇章管理</button>
                         <button data-admin-view="challenges" class="w-full text-left p-2 rounded-lg text-gray-700 font-semibold hover:bg-gray-200">部门挑战管理</button>
+                        <button data-admin-view="factions" class="w-full text-left p-2 rounded-lg text-gray-700 font-semibold hover:bg-gray-200">阵营管理</button>
                     </nav>
                     <div class="p-4 mt-auto border-t border-gray-200">
                         <button id="admin-back-to-lobby-btn" class="w-full btn bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">返回大厅</button>
@@ -185,6 +189,7 @@
                     <div id="admin-section-list-view" class="hidden"><div class="flex justify-between items-center mb-4"><h2 id="admin-section-list-title" class="text-2xl font-semibold text-gray-700"></h2><button id="admin-add-section-btn" data-action="add" data-type="section" class="btn btn-primary font-bold py-2 px-4 rounded-lg">＋ 新增小节</button></div><div id="admin-sections-table-container" class="bg-white p-6 rounded-lg shadow-md"></div></div>
                     <div id="admin-block-editor-view" class="hidden"><div class="flex justify-between items-center mb-4"><h2 id="admin-editor-section-title" class="text-2xl font-semibold text-gray-700"></h2><button id="admin-add-new-block-btn" data-action="add" data-type="block" class="btn btn-primary font-bold py-2 px-4 rounded-lg">＋ 新增内容块</button></div><div id="admin-blocks-list" class="space-y-4 mb-6"></div></div>
                     <div id="admin-challenges-list-view" class="hidden"><div class="flex justify-between items-center mb-4"><h2 class="text-2xl font-semibold text-gray-700">部门挑战管理</h2><button id="admin-add-challenge-btn" data-action="add" data-type="challenge" class="btn btn-primary font-bold py-2 px-4 rounded-lg">＋ 新增挑战</button></div><div id="admin-challenges-table-container" class="bg-white p-6 rounded-lg shadow-md"></div></div>
+                    <div id="admin-factions-list-view" class="hidden"><div class="flex justify-between items-center mb-4"><h2 class="text-2xl font-semibold text-gray-700">阵营管理</h2><button id="admin-add-faction-btn" data-action="add" data-type="faction" class="btn btn-primary font-bold py-2 px-4 rounded-lg">＋ 新增阵营</button></div><div id="admin-factions-table-container" class="bg-white p-6 rounded-lg shadow-md"></div></div>
                 </main>
             </div>
         </section>
@@ -256,10 +261,11 @@
             console.log('✅ 所有依赖加载成功');
         });
 
-        // Supabase configuration remains unchanged as requested
+        // API配置 - 使用Lctm-bd API服务器
+        window.API_URL = 'http://localhost:3001/api';
         window.APP_CONFIG = {
-            SUPABASE_URL: 'https://mfxlcdsrnzxjslrfaawz.supabase.co',
-            SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1meGxjZHNybnp4anNscmZhYXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE2ODQyODMsImV4cCI6MjA2NzI2MDI4M30.wTuqqQkOP2_ZwfUU_xM0-X9YjkM39-kewjN41Pxa_wA'
+            // 已切换到API服务器，不再使用Supabase
+            API_BASE_URL: 'http://localhost:3001/api'
         };
     </script>
     <script type="module" src="js/performance-monitor.js"></script>

@@ -26,28 +26,38 @@ const App = {
         this.initLandingPageAnimation();
         this.initMusicControls();
         ApiService.initialize();
-        ApiService.db.auth.onAuthStateChange((_event, session) => {
-            if (this.isHandlingAuth) {
-                console.log('认证处理中，跳过重复处理');
-                return;
-            }
-            
-            if (session && session.user) {
-                console.log('🔄 检测到有效会话，自动恢复登录状态');
-                this.isHandlingAuth = true;
-                // [OPTIMIZATION] Set navigate to true to automatically enter the lobby
-                this.handleLogin(session.user, true).finally(() => {
-                    this.isHandlingAuth = false;
-                });
-            } else {
-                // 会话为空时的处理
-                console.log('🔓 检测到用户会话已失效');
-                AppState.user = null;
-                AppState.profile = null;
-                resetUserProgressState();
-                UI.showNarrative();
-            }
-        });
+        
+        // 检查是否使用 API 服务器
+        const useApiServer = window.API_URL && window.API_URL.includes('localhost:3001');
+        
+        if (useApiServer) {
+            // API 服务器模式：检查本地存储的认证状态
+            this.checkApiServerAuthState();
+        } else {
+            // Supabase 模式：使用认证状态监听
+            ApiService.db.auth.onAuthStateChange((_event, session) => {
+                if (this.isHandlingAuth) {
+                    console.log('认证处理中，跳过重复处理');
+                    return;
+                }
+                
+                if (session && session.user) {
+                    console.log('🔄 检测到有效会话，自动恢复登录状态');
+                    this.isHandlingAuth = true;
+                    // [OPTIMIZATION] Set navigate to true to automatically enter the lobby
+                    this.handleLogin(session.user, true).finally(() => {
+                        this.isHandlingAuth = false;
+                    });
+                } else {
+                    // 会话为空时的处理
+                    console.log('🔓 检测到用户会话已失效');
+                    AppState.user = null;
+                    AppState.profile = null;
+                    resetUserProgressState();
+                    UI.showNarrative();
+                }
+            });
+        }
 
         // 新增：监听自定义退出事件
         window.addEventListener('userSignOut', (event) => {
@@ -59,6 +69,41 @@ const App = {
                 resetUserProgressState();
             }
         });
+    },
+
+    // API 服务器认证状态检查
+    async checkApiServerAuthState() {
+        try {
+            console.log('🔍 检查 API 服务器认证状态...');
+            const { data: { session }, error } = await ApiService.db.auth.getSession();
+            
+            if (error) {
+                console.log('❌ 认证状态检查失败:', error);
+                this.showLoginScreen();
+                return;
+            }
+            
+            if (session && session.user) {
+                console.log('✅ 发现有效会话，自动恢复登录状态');
+                this.isHandlingAuth = true;
+                await this.handleLogin(session.user, true);
+                this.isHandlingAuth = false;
+            } else {
+                console.log('🔓 未发现有效会话，显示登录界面');
+                this.showLoginScreen();
+            }
+        } catch (error) {
+            console.error('❌ 认证状态检查异常:', error);
+            this.showLoginScreen();
+        }
+    },
+
+    // 显示登录界面
+    showLoginScreen() {
+        AppState.user = null;
+        AppState.profile = null;
+        resetUserProgressState();
+        UI.showNarrative();
     },
 
     initLandingPageAnimation() {
@@ -342,6 +387,16 @@ const App = {
             AppState.leaderboard = personalLb.status === 'fulfilled' ? personalLb.value : [];
             AppState.factionLeaderboard = factionLb.status === 'fulfilled' ? factionLb.value : [];
             
+            // 调试信息
+            if (factionLb.status === 'rejected') {
+                console.error('阵营榜加载失败:', factionLb.reason);
+            }
+            if (challenges.status === 'rejected') {
+                console.error('挑战数据加载失败:', challenges.reason);
+            } else {
+                console.log('挑战数据加载成功:', AppState.activeChallenges);
+            }
+            
             this.updateHeaders();
             
             // 立即显示界面
@@ -374,11 +429,11 @@ const App = {
         UI.elements.lobby.adminNavBtn.style.display = isAdmin ? 'flex' : 'none';
     },
     
-    renderGameLobby(isLoggedIn) {
+    async renderGameLobby(isLoggedIn) {
         const { lobby } = UI.elements;
         if (isLoggedIn) {
             const profile = AppState.profile;
-            const factionInfo = getFactionInfo(profile.faction);
+            const factionInfo = await getFactionInfo(profile.faction);
             const avatarChar = (profile.username || '玩家').charAt(0).toUpperCase();
             const points = profile.points || 0;
             const level = Math.floor(points / 100) + 1;
@@ -389,7 +444,7 @@ const App = {
             lobby.logoutBtn.classList.remove('hidden');
             lobby.adminNavBtn.style.display = profile.role === 'admin' ? 'flex' : 'none';
             // [REMOVED] Logic for the old plot task button
-            this.renderLeaderboards();
+            await this.renderLeaderboards();
         } else {
             lobby.avatar.textContent = '?';
             lobby.avatar.style.borderColor = '#475569';
@@ -402,7 +457,7 @@ const App = {
         }
     },
 
-    renderLeaderboards() {
+    async renderLeaderboards() {
         const { personalBoard, factionBoard } = UI.elements.lobby;
         if (!AppState.leaderboard || AppState.leaderboard.length === 0) {
             UI.renderEmpty(personalBoard, '暂无个人排名');
@@ -418,10 +473,15 @@ const App = {
         if (!AppState.factionLeaderboard || AppState.factionLeaderboard.length === 0) {
             UI.renderEmpty(factionBoard, '暂无部门排名');
         } else {
-            factionBoard.innerHTML = AppState.factionLeaderboard.map(f => {
-                const fInfo = getFactionInfo(f.faction);
-                return `<div class="faction-leaderboard-item faction-${fInfo.color}"><div class="flex justify-between items-start"><div><h3 class="faction-name faction-name-${fInfo.color}">${fInfo.name}</h3><div class="faction-stats"><span>👥 ${f.total_members}</span><span>⭐ ${f.total_points}</span></div></div><div class="faction-score"><div class="avg-score">${parseFloat(f.average_score).toFixed(0)}</div><div class="avg-label">均分</div></div></div></div>`;
-            }).join('');
+            console.log('渲染阵营榜数据:', AppState.factionLeaderboard);
+            const factionPromises = AppState.factionLeaderboard.map(async f => {
+                const fInfo = await getFactionInfo(f.faction);
+                console.log('阵营信息:', f.faction, '->', fInfo);
+                return `<div class="faction-leaderboard-item" style="border-color: ${fInfo.color}50"><div class="flex justify-between items-start"><div><h3 class="faction-name" style="color: ${fInfo.color}">${fInfo.name}</h3><div class="faction-stats"><span>👥 ${f.total_members}</span><span>⭐ ${f.total_points}</span></div></div><div class="faction-score"><div class="avg-score">${parseFloat(f.average_score).toFixed(0)}</div><div class="avg-label">均分</div></div></div></div>`;
+            });
+            
+            const factionHtmls = await Promise.all(factionPromises);
+            factionBoard.innerHTML = factionHtmls.join('');
         }
     },
     
@@ -462,7 +522,9 @@ const App = {
     },
 
     async renderFactionChallenges(container) {
+        console.log('渲染阵营挑战，数据:', AppState.activeChallenges);
         if (!AppState.activeChallenges || AppState.activeChallenges.length === 0) {
+            console.log('没有活跃挑战数据');
             UI.renderEmpty(container, '当前没有阵营挑战');
             return;
         }
@@ -477,7 +539,33 @@ const App = {
         }
     },
 
-    showFactionSelection() { UI.elements.factionModal.container.classList.remove('hidden'); UI.elements.factionModal.container.classList.add('flex'); },
+    async showFactionSelection() { 
+        try {
+            // 加载阵营列表
+            const factions = await ApiService.getPublicFactions();
+            
+            // 生成阵营选择卡片
+            const grid = UI.elements.factionModal.grid;
+            grid.innerHTML = factions.map(faction => `
+                <div class="faction-card-sm border-2 p-4 rounded-lg hover:bg-opacity-10 transition-colors" style="border-color: ${faction.color}50">
+                    <button data-faction="${faction.code}" class="faction-btn w-full h-full text-lg font-semibold" style="color: ${faction.color}">
+                        ${faction.name}
+                    </button>
+                </div>
+            `).join('');
+            
+            // 添加点击事件监听器
+            grid.querySelectorAll('.faction-btn').forEach(btn => {
+                btn.addEventListener('click', () => this.handleFactionSelection(btn.dataset.faction));
+            });
+            
+            UI.elements.factionModal.container.classList.remove('hidden'); 
+            UI.elements.factionModal.container.classList.add('flex'); 
+        } catch (error) {
+            console.error('加载阵营列表失败:', error);
+            UI.showNotification('加载阵营列表失败', 'error');
+        }
+    },
     hideFactionSelection() { UI.elements.factionModal.container.classList.add('hidden'); UI.elements.factionModal.container.classList.remove('flex'); },
 
     async handleFactionSelection(faction) {
@@ -485,7 +573,7 @@ const App = {
             const updatedProfile = await ApiService.updateProfileFaction(AppState.user.id, faction);
             AppState.profile.faction = updatedProfile.faction; 
             this.hideFactionSelection();
-            const factionInfo = getFactionInfo(faction);
+            const factionInfo = await getFactionInfo(faction);
             UI.showNotification(`你已加入【${factionInfo.name}】！`, 'success');
             await this.loadMainAppData();
             UI.switchTopLevelView('game-lobby');
@@ -512,8 +600,11 @@ window.App = App;
 window.onload = () => {
     try { 
         // 检查必要的配置
-        if (!window.APP_CONFIG || !window.APP_CONFIG.SUPABASE_URL || !window.APP_CONFIG.SUPABASE_KEY) {
-            throw new Error('应用配置缺失，无法启动');
+        const useApiServer = window.API_URL && window.API_URL.includes('localhost:3001');
+        const useSupabase = window.APP_CONFIG && window.APP_CONFIG.SUPABASE_URL && window.APP_CONFIG.SUPABASE_KEY;
+        
+        if (!useApiServer && !useSupabase) {
+            throw new Error('应用配置缺失，无法启动。请检查 API 服务器或 Supabase 配置。');
         }
         
         App.init(); 

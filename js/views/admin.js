@@ -6,6 +6,7 @@
 import { AppState } from '../state.js';
 import { UI } from '../ui.js';
 import { ApiService } from '../services/api.js';
+import { clearFactionCache } from '../constants.js';
 
 export const AdminView = {
     _isInitialized: false,
@@ -31,6 +32,7 @@ export const AdminView = {
         admin.addSectionBtn?.addEventListener('click', () => this.openModal('section'));
         admin.addNewBlockBtn?.addEventListener('click', () => this.openModal('block'));
         admin.addChallengeBtn?.addEventListener('click', () => this.openModal('challenge'));
+        admin.addFactionBtn?.addEventListener('click', () => this.openModal('faction'));
 
         // --- Event Delegation for Dynamic List Content ---
         const setupListListener = (element, type) => {
@@ -41,6 +43,7 @@ export const AdminView = {
         setupListListener(admin.sectionsTableContainer, 'section');
         setupListListener(admin.blocksList, 'block');
         setupListListener(admin.challengesTableContainer, 'challenge');
+        setupListListener(admin.factionsTableContainer, 'faction');
         
         // --- Other Listeners ---
         admin.breadcrumb?.addEventListener('click', (e) => this.handleBreadcrumbClick(e));
@@ -64,6 +67,8 @@ export const AdminView = {
         button.classList.add('active');
         if (view === 'challenges') {
             this.showChallengesList();
+        } else if (view === 'factions') {
+            this.showFactionsList();
         } else {
             this.showCategoryList();
         }
@@ -77,6 +82,7 @@ export const AdminView = {
             case 'section': item = AppState.admin.selectedChapter?.sections.find(s => s.id === id); break;
             case 'block': item = AppState.admin.selectedSection?.blocks.find(b => b.id === id); break;
             case 'challenge': item = AppState.admin.challenges.find(c => c.id === id); break;
+            case 'faction': item = AppState.admin.factions.find(f => f.id === id); break;
         }
 
         switch(action) {
@@ -84,7 +90,7 @@ export const AdminView = {
             case 'view-sections': if(item) this.showSectionList(item); break;
             case 'view-blocks': if(item) this.showBlockEditor(item); break;
             case 'edit': if(item) this.openModal(type, item); break;
-            case 'delete': if(item) this.showDeleteConfirmation(type, id, item.title); break;
+            case 'delete': if(item) this.showDeleteConfirmation(type, id, item.title || item.name); break;
             case 'end-challenge': if(item) this.handleEndChallenge(id, item.title); break;
         }
     },
@@ -221,6 +227,10 @@ export const AdminView = {
                 const categoryOptions = AppState.admin.categories.map(c => `<option value="${c.id}" ${v('target_category_id') === c.id ? 'selected' : ''}>${c.title}</option>`).join('');
                 formHtml = `<div><label class="admin-label">标题</label><input name="title" class="admin-input" value="${v('title')}" required></div><div><label class="admin-label">描述</label><textarea name="description" class="admin-textarea" rows="3">${v('description')}</textarea></div><div><label class="admin-label">目标篇章</label><select name="target_category_id" class="admin-select" required><option value="">选择篇章</option>${categoryOptions}</select></div><div class="grid grid-cols-2 gap-4"><div><label class="admin-label">开始时间</label><input name="start_date" type="datetime-local" class="admin-input" value="${v('start_date', new Date().toISOString().substring(0, 16))}" required></div><div><label class="admin-label">结束时间</label><input name="end_date" type="datetime-local" class="admin-input" value="${v('end_date', new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().substring(0, 16))}" required></div></div><div><label class="admin-label">奖励积分</label><input name="reward_points" type="number" class="admin-input" value="${v('reward_points', 0)}" required></div><div class="flex items-center space-x-2"><input id="is_active" name="is_active" type="checkbox" class="admin-checkbox" ${v('is_active', true) ? 'checked' : ''}><label for="is_active" class="admin-label">是否活跃</label></div>`;
                 break;
+            case 'faction':
+                modal.title.textContent = item ? '编辑阵营' : '新增阵营';
+                formHtml = `<div><label class="admin-label">阵营代码</label><input name="code" class="admin-input" value="${v('code')}" placeholder="如: it_dept" required></div><div><label class="admin-label">阵营名称</label><input name="name" class="admin-input" value="${v('name')}" placeholder="如: IT技术部" required></div><div><label class="admin-label">描述</label><textarea name="description" class="admin-textarea" rows="3" placeholder="阵营描述">${v('description')}</textarea></div><div><label class="admin-label">颜色</label><input name="color" type="color" class="admin-input w-20 h-10" value="${v('color', '#FF5733')}" required></div><div><label class="admin-label">排序</label><input name="sort_order" type="number" class="admin-input" value="${v('sort_order', 0)}" min="0"></div><div class="flex items-center space-x-2"><input id="faction_is_active" name="is_active" type="checkbox" class="admin-checkbox" ${v('is_active', true) ? 'checked' : ''}><label for="faction_is_active" class="admin-label">启用阵营</label></div>`;
+                break;
         }
         modal.form.innerHTML = formHtml; 
         modal.backdrop.classList.remove('hidden');
@@ -250,6 +260,12 @@ export const AdminView = {
                     data.is_active = data.is_active === 'on';
                     await ApiService.upsertChallenge({ id: item?.id, ...data });
                     break;
+                case 'faction':
+                    data.is_active = data.is_active === 'on';
+                    data.sort_order = parseInt(data.sort_order) || 0;
+                    await ApiService.upsertFaction({ id: item?.id, ...data });
+                    clearFactionCache(); // 清除阵营缓存
+                    break;
             }
             UI.showNotification('保存成功', 'success'); this.closeModal();
             this.refreshAdminViewAfterSave();
@@ -258,6 +274,8 @@ export const AdminView = {
     async refreshAdminViewAfterSave() {
         if (AppState.admin.view === 'challengesListView') {
             await this.showChallengesList();
+        } else if (AppState.admin.view === 'factionsListView') {
+            await this.showFactionsList();
         } else {
             const freshData = await ApiService.fetchAllCategoriesForAdmin(); 
             AppState.admin.categories = freshData;
@@ -280,6 +298,10 @@ export const AdminView = {
                 case 'section': await ApiService.deleteSection(id); break; 
                 case 'block': await ApiService.deleteBlock(id); break; 
                 case 'challenge': await ApiService.deleteChallenge(id); break;
+                case 'faction': 
+                    await ApiService.deleteFaction(id); 
+                    clearFactionCache(); // 清除阵营缓存
+                    break;
             }
             UI.showNotification('删除成功', 'success');
             await this.refreshAdminViewAfterSave();
@@ -304,6 +326,83 @@ export const AdminView = {
             case 'categories': this.showCategoryList(); break;
             case 'chapters': this.showChapterList(AppState.admin.categories.find(c => c.id == id)); break;
             case 'sections': this.showSectionList(AppState.admin.selectedCategory.chapters.find(c => c.id == id)); break;
+        }
+    },
+
+    async showFactionsList() {
+        try {
+            // 隐藏其他视图
+            UI.elements.admin.categoryListView.classList.add('hidden');
+            UI.elements.admin.chapterListView.classList.add('hidden');
+            UI.elements.admin.sectionListView.classList.add('hidden');
+            UI.elements.admin.blockEditorView.classList.add('hidden');
+            UI.elements.admin.challengesListView.classList.add('hidden');
+            UI.elements.admin.factionsListView.classList.remove('hidden');
+
+            // 设置面包屑
+            UI.elements.admin.breadcrumb.innerHTML = '<a href="#" data-nav="categories">篇章管理</a> / 阵营管理';
+
+            // 加载阵营数据
+            const factions = await ApiService.getFactions();
+            AppState.admin.factions = factions;
+
+            // 渲染阵营列表
+            const container = UI.elements.admin.factionsTableContainer;
+            if (factions.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-8">暂无阵营数据</p>';
+                return;
+            }
+
+            const tableHtml = `
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b border-gray-200">
+                                <th class="text-left py-3 px-4 font-semibold">阵营代码</th>
+                                <th class="text-left py-3 px-4 font-semibold">阵营名称</th>
+                                <th class="text-left py-3 px-4 font-semibold">描述</th>
+                                <th class="text-left py-3 px-4 font-semibold">颜色</th>
+                                <th class="text-left py-3 px-4 font-semibold">排序</th>
+                                <th class="text-left py-3 px-4 font-semibold">状态</th>
+                                <th class="text-left py-3 px-4 font-semibold">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${factions.map(faction => `
+                                <tr class="border-b border-gray-100 hover:bg-gray-50">
+                                    <td class="py-3 px-4 font-mono text-sm">${faction.code}</td>
+                                    <td class="py-3 px-4 font-semibold">${faction.name}</td>
+                                    <td class="py-3 px-4 text-gray-600">${faction.description || '-'}</td>
+                                    <td class="py-3 px-4">
+                                        <div class="flex items-center">
+                                            <div class="w-4 h-4 rounded mr-2" style="background-color: ${faction.color}"></div>
+                                            <span class="text-sm font-mono">${faction.color}</span>
+                                        </div>
+                                    </td>
+                                    <td class="py-3 px-4">${faction.sort_order}</td>
+                                    <td class="py-3 px-4">
+                                        <span class="px-2 py-1 rounded-full text-xs ${faction.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+                                            ${faction.is_active ? '启用' : '禁用'}
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-4">
+                                        <div class="flex space-x-2">
+                                            <button data-action="edit" data-id="${faction.id}" data-type="faction" class="text-blue-600 hover:text-blue-800 text-sm">编辑</button>
+                                            <button data-action="delete" data-id="${faction.id}" data-type="faction" class="text-red-600 hover:text-red-800 text-sm">删除</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            container.innerHTML = tableHtml;
+
+            AppState.admin.view = 'factionsListView';
+        } catch (error) {
+            console.error('加载阵营列表失败:', error);
+            UI.showNotification('加载阵营列表失败', 'error');
         }
     }
 };
