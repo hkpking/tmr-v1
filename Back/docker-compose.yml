@@ -1,0 +1,49 @@
+services:
+  # 应用服务 (连接远程数据库)
+  app:
+    build: .
+    container_name: lctmr-app-remote
+    environment:
+      NODE_ENV: production
+      DB_HOST: 101.32.59.153
+      DB_PORT: 5432
+      DB_USER: web_app
+      DB_PASSWORD: Dslr*2025#app
+      DB_NAME: lctmr_production
+      DB_SSL: false
+      JWT_SECRET: 7YtYAMJUa4LaqChbkV0iN5IMSHvaBCVtBmUktZX3E8JOG0i+4TShH5vXl2HhleUMNITi4thFiYv8UFbdiazkqA==
+      JWT_EXPIRES_IN: 24h
+      FRONTEND_URL: http://localhost:5500
+      API_URL: http://localhost:3001/api
+      PORT: 3001
+    ports:
+      - "3001:3001"
+    networks:
+      - lctmr-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Nginx 反向代理
+  nginx:
+    image: nginx:alpine
+    container_name: lctmr-nginx-remote
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./:/app:ro  # 挂载应用文件到nginx容器
+    depends_on:
+      - app
+    networks:
+      - lctmr-network
+    restart: unless-stopped
+
+networks:
+  lctmr-network:
+    driver: bridge

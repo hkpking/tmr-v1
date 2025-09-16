@@ -1,0 +1,126 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lctmr-backend
+  namespace: czl-test
+  labels:
+    app: lctmr-backend
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: lctmr-backend
+  template:
+    metadata:
+      labels:
+        app: lctmr-backend
+        version: v1
+    spec:
+      containers:
+      - name: backend
+        image: harbor.cosmo-lady.com/lctmr-backend/lctmr-backend:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3001
+          name: http
+        env:
+        - name: NODE_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: lctmr-config
+              key: NODE_ENV
+        - name: DB_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: lctmr-config
+              key: DB_HOST
+        - name: DB_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: lctmr-config
+              key: DB_PORT
+        - name: DB_USER
+          valueFrom:
+            configMapKeyRef:
+              name: lctmr-config
+              key: DB_USER
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: lctmr-secret
+              key: DB_PASSWORD
+        - name: DB_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: lctmr-config
+              key: DB_NAME
+        - name: DB_SSL
+          valueFrom:
+            configMapKeyRef:
+              name: lctmr-config
+              key: DB_SSL
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: lctmr-secret
+              key: JWT_SECRET
+        - name: JWT_EXPIRES_IN
+          valueFrom:
+            configMapKeyRef:
+              name: lctmr-config
+              key: JWT_EXPIRES_IN
+        - name: API_URL
+          valueFrom:
+            configMapKeyRef:
+              name: lctmr-config
+              key: API_URL
+        - name: FRONTEND_URL
+          valueFrom:
+            configMapKeyRef:
+              name: lctmr-config
+              key: FRONTEND_URL
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: lctmr-config
+              key: PORT
+        - name: DB_CONNECTION_LIMIT
+          valueFrom:
+            configMapKeyRef:
+              name: lctmr-config
+              key: DB_CONNECTION_LIMIT
+        - name: DB_IDLE_TIMEOUT
+          valueFrom:
+            configMapKeyRef:
+              name: lctmr-config
+              key: DB_IDLE_TIMEOUT
+        - name: DB_CONNECTION_TIMEOUT
+          valueFrom:
+            configMapKeyRef:
+              name: lctmr-config
+              key: DB_CONNECTION_TIMEOUT
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      restartPolicy: Always

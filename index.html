@@ -18,12 +18,13 @@
     <link rel="stylesheet" href="css/style.css">
     
     <!-- 环境配置 -->
+    <script src="config.js"></script>
     <script>
-        // 设置环境变量
-        window.NODE_ENV = 'development';
+        // 设置环境变量（从config.js加载）
+        window.NODE_ENV = window.NODE_ENV || 'production';
         window.DB_TYPE = 'postgresql';
-        window.API_URL = 'http://localhost:3001/api';
-        window.FRONTEND_URL = 'http://localhost:5500';
+        window.API_URL = window.API_URL || 'http://localhost:3001/api';
+        window.FRONTEND_URL = window.FRONTEND_URL || 'http://localhost:3000';
     </script>
 </head>
 <body class="text-gray-200">
@@ -261,11 +262,11 @@
             console.log('✅ 所有依赖加载成功');
         });
 
-        // API配置 - 使用Lctm-bd API服务器
-        window.API_URL = 'http://localhost:3001/api';
+        // API配置 - 使用环境变量配置
+        // window.API_URL 和 window.FRONTEND_URL 已在上面设置
         window.APP_CONFIG = {
             // 已切换到API服务器，不再使用Supabase
-            API_BASE_URL: 'http://localhost:3001/api'
+            API_BASE_URL: window.API_URL
         };
     </script>
     <script type="module" src="js/performance-monitor.js"></script>

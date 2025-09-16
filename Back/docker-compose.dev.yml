@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  app-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    volumes:
+      # 挂载源代码，实现热重载
+      - .:/app
+      - /app/node_modules
+      - /app/server/node_modules
+    environment:
+      - NODE_ENV=development
+      - DB_TYPE=postgresql
+      - DB_HOST=host.docker.internal
+      - DB_PORT=54322
+      - DB_NAME=postgres
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+    depends_on:
+      - nginx-dev
+    networks:
+      - lctmr-dev
+
+  nginx-dev:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - app-dev
+    networks:
+      - lctmr-dev
+
+networks:
+  lctmr-dev:
+    driver: bridge
+

@@ -1,85 +1,40 @@
 /**
- * 数据库配置文件
- * 统一管理所有数据库相关配置
- * 支持多种数据库类型：PostgreSQL, Supabase, MySQL 等
+ * 远程数据库配置包
+ * 用于生产环境和远程开发环境
  */
 
 // 数据库类型枚举
 const DATABASE_TYPES = {
-    POSTGRESQL: 'postgresql',
-    SUPABASE: 'supabase',
-    MYSQL: 'mysql',
-    SQLITE: 'sqlite'
+    POSTGRESQL: 'postgresql'
 };
 
 // 当前使用的数据库类型
-const CURRENT_DB_TYPE = DATABASE_TYPES.POSTGRESQL; // 可以在这里切换数据库类型
+const CURRENT_DB_TYPE = DATABASE_TYPES.POSTGRESQL;
 
-// 数据库配置
+// 远程数据库配置
 const DATABASE_CONFIGS = {
-    // PostgreSQL 配置
     [DATABASE_TYPES.POSTGRESQL]: {
-        // 本地开发环境
         development: {
-            host: 'localhost',
-            port: 5432,
-            user: 'postgres',
-            password: 'admin',
-            database: 'lctmr_local',
-            ssl: false,
-            connectionLimit: 20,
-            idleTimeout: 30000,
-            connectionTimeout: 2000
-        },
-        // 生产环境
-        production: {
-            host: process.env.DB_HOST || 'localhost',
-            port: process.env.DB_PORT || 5432,
-            user: process.env.DB_USER || 'postgres',
-            password: process.env.DB_PASSWORD || 'admin',
-            database: process.env.DB_NAME || 'lctmr_prod',
-            ssl: process.env.DB_SSL === 'true',
+            host: process.env.DB_HOST || '101.32.59.153',
+            port: parseInt(process.env.DB_PORT) || 5432,
+            user: process.env.DB_USER || 'web_app',
+            password: process.env.DB_PASSWORD || 'Dslr*2025#app',
+            database: process.env.DB_NAME || 'lctmr_production',
+            ssl: process.env.DB_SSL === 'true' || false,
             connectionLimit: 50,
             idleTimeout: 30000,
             connectionTimeout: 2000
-        }
-    },
-
-    // Supabase 配置
-    [DATABASE_TYPES.SUPABASE]: {
-        development: {
-            url: 'https://your-project.supabase.co',
-            anonKey: 'your-anon-key',
-            serviceRoleKey: 'your-service-role-key'
         },
         production: {
-            url: process.env.SUPABASE_URL || 'https://your-project.supabase.co',
-            anonKey: process.env.SUPABASE_ANON_KEY || 'your-anon-key',
-            serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || 'your-service-role-key'
-        }
-    },
-
-    // MySQL 配置
-    [DATABASE_TYPES.MYSQL]: {
-        development: {
-            host: 'localhost',
-            port: 3306,
-            user: 'root',
-            password: 'password',
-            database: 'lctmr_local',
-            connectionLimit: 20,
-            acquireTimeout: 60000,
-            timeout: 60000
-        },
-        production: {
-            host: process.env.DB_HOST || 'localhost',
-            port: process.env.DB_PORT || 3306,
-            user: process.env.DB_USER || 'root',
-            password: process.env.DB_PASSWORD || 'password',
-            database: process.env.DB_NAME || 'lctmr_prod',
+            host: process.env.DB_HOST || '101.32.59.153',
+            port: parseInt(process.env.DB_PORT) || 5432,
+            user: process.env.DB_USER || 'web_app',
+            password: process.env.DB_PASSWORD || 'Dslr*2025#app',
+            database: process.env.DB_NAME || 'lctmr_production',
+            ssl: process.env.DB_SSL === 'true' || false,
             connectionLimit: 50,
-            acquireTimeout: 60000,
-            timeout: 60000
+            idleTimeout: 30000,
+            connectionTimeout: 2000
         }
     }
 };
@@ -107,25 +62,13 @@ function getCurrentDatabaseConfig() {
 // 获取数据库连接字符串
 function getConnectionString() {
     const config = getCurrentDatabaseConfig();
-    
-    switch (config.type) {
-        case DATABASE_TYPES.POSTGRESQL:
-            return `postgresql://${config.user}:${config.password}@${config.host}:${config.port}/${config.database}`;
-        
-        case DATABASE_TYPES.MYSQL:
-            return `mysql://${config.user}:${config.password}@${config.host}:${config.port}/${config.database}`;
-        
-        default:
-            throw new Error(`不支持的数据库类型: ${config.type}`);
-    }
+    return `postgresql://${config.user}:${config.password}@${config.host}:${config.port}/${config.database}`;
 }
 
 // 获取 API 配置
 function getApiConfig() {
-    const config = getCurrentDatabaseConfig();
-    
     return {
-        useApiServer: config.type !== DATABASE_TYPES.SUPABASE,
+        useApiServer: true,
         apiBaseUrl: process.env.API_URL || 'http://localhost:3001/api',
         frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5500'
     };
@@ -137,17 +80,6 @@ function getJwtConfig() {
         secret: process.env.JWT_SECRET || '7YtYAMJUa4LaqChbkV0iN5IMSHvaBCVtBmUktZX3E8JOG0i+4TShH5vXl2HhleUMNITi4thFiYv8UFbdiazkqA==',
         expiresIn: process.env.JWT_EXPIRES_IN || '24h'
     };
-}
-
-// 数据库切换函数
-function switchDatabaseType(newType) {
-    if (!DATABASE_TYPES[newType]) {
-        throw new Error(`不支持的数据库类型: ${newType}`);
-    }
-    
-    // 这里可以添加切换逻辑
-    console.log(`数据库类型已切换为: ${newType}`);
-    return newType;
 }
 
 // 验证配置
@@ -171,6 +103,5 @@ module.exports = {
     getConnectionString,
     getApiConfig,
     getJwtConfig,
-    switchDatabaseType,
     validateConfig
 };

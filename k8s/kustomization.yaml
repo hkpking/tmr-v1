@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: czl-test
+
+resources:
+- namespace.yaml
+- configmap.yaml
+- secret.yaml
+- backend-deployment.yaml
+- frontend-deployment.yaml
+- services.yaml
+- ingress.yaml
+- hpa.yaml
+
+commonLabels:
+  app.kubernetes.io/name: lctmr
+  app.kubernetes.io/version: v1.0.0
+  app.kubernetes.io/managed-by: kustomize

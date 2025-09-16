@@ -600,7 +600,7 @@ window.App = App;
 window.onload = () => {
     try { 
         // 检查必要的配置
-        const useApiServer = window.API_URL && window.API_URL.includes('localhost:3001');
+        const useApiServer = window.API_URL && window.API_URL.includes('/api');
         const useSupabase = window.APP_CONFIG && window.APP_CONFIG.SUPABASE_URL && window.APP_CONFIG.SUPABASE_KEY;
         
         if (!useApiServer && !useSupabase) {

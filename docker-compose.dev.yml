@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # 前端开发服务
+  frontend-dev:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: lctmr-frontend-dev
+    ports:
+      - "3000:80"
+    environment:
+      - API_URL=http://localhost:3001/api
+      - FRONTEND_URL=http://localhost:3000
+      - NODE_ENV=development
+    depends_on:
+      - backend-dev
+    networks:
+      - lctmr-dev-network
+    restart: unless-stopped
+
+  # 后端开发服务
+  backend-dev:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: lctmr-backend-dev
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - DB_HOST=localhost
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=lctmr_development
+      - DB_SSL=false
+      - JWT_SECRET=dev-jwt-secret-key-7YtYAMJUa4LaqChbkV0iN5IMSHvaBCVtBmUktZX3E8JOG0i+4TShH5vXl2HhleUMNITi4thFiYv8UFbdiazkqA==
+      - JWT_EXPIRES_IN=24h
+      - API_URL=http://localhost:3001/api
+      - FRONTEND_URL=http://localhost:3000
+      - PORT=3001
+    volumes:
+      # 挂载源代码，实现热重载
+      - ./server:/app
+      - /app/node_modules
+    networks:
+      - lctmr-dev-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  lctmr-dev-network:
+    driver: bridge

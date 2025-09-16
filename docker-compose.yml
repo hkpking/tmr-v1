@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  # 前端服务
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: lctmr-frontend
+    ports:
+      - "3000:80"
+    environment:
+      - API_URL=http://localhost:3001/api
+      - FRONTEND_URL=http://localhost:3000
+      - BACKEND_SERVICE_NAME=backend
+      - NODE_ENV=production
+    depends_on:
+      - backend
+    networks:
+      - lctmr-network
+    restart: unless-stopped
+
+  # 后端API服务
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: lctmr-backend
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=101.32.59.153
+      - DB_PORT=5432
+      - DB_USER=web_app
+      - DB_PASSWORD=Dslr*2025#app
+      - DB_NAME=lctmr_production
+      - DB_SSL=false
+      - JWT_SECRET=7YtYAMJUa4LaqChbkV0iN5IMSHvaBCVtBmUktZX3E8JOG0i+4TShH5vXl2HhleUMNITi4thFiYv8UFbdiazkqA==
+      - JWT_EXPIRES_IN=24h
+      - API_URL=http://localhost:3001/api
+      - FRONTEND_URL=http://localhost:3000
+      - PORT=3001
+    networks:
+      - lctmr-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  lctmr-network:
+    driver: bridge
